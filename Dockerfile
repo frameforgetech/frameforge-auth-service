@@ -9,7 +9,7 @@ COPY frameforge-shared-contracts/tsconfig.json ./frameforge-shared-contracts/
 COPY frameforge-shared-contracts/src ./frameforge-shared-contracts/src/
 
 WORKDIR /build/frameforge-shared-contracts
-RUN npm ci && npm run build
+RUN npm install && npm run build
 
 # Copy auth service files
 WORKDIR /build/frameforge-auth-service
@@ -17,7 +17,7 @@ COPY frameforge-auth-service/package*.json ./
 COPY frameforge-auth-service/tsconfig.json ./
 
 # Install dependencies (npm will resolve file:../frameforge-shared-contracts)
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY frameforge-auth-service/src ./src/
@@ -42,7 +42,7 @@ WORKDIR /app/frameforge-auth-service
 COPY frameforge-auth-service/package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production && \
+RUN npm install --only=production && \
     npm cache clean --force
 
 # Copy built application from builder
