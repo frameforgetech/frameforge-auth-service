@@ -3,14 +3,25 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy shared contracts first
+COPY frameforge-shared-contracts/package*.json ./shared-contracts/
+COPY frameforge-shared-contracts/tsconfig.json ./shared-contracts/
+COPY frameforge-shared-contracts/src ./shared-contracts/src/
 
-# Install all dependencies (including dev dependencies for build)
+# Build shared contracts
+WORKDIR /app/shared-contracts
+RUN npm ci && npm run build
+
+# Copy auth service files
+WORKDIR /app/auth-service
+COPY frameforge-auth-service/package*.json ./
+
+# Install dependencies (will use the local shared-contracts)
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY frameforge-auth-service/src ./src/
+COPY frameforge-auth-service/tsconfig.json ./
 
 # Build TypeScript
 RUN npm run build
@@ -21,17 +32,21 @@ FROM node:20-alpine
 # Install tini for proper signal handling
 RUN apk add --no-cache tini
 
-WORKDIR /app
+# Set up shared contracts directory
+WORKDIR /app/shared-contracts
+COPY --from=builder /app/shared-contracts/package*.json ./
+COPY --from=builder /app/shared-contracts/dist ./dist/
 
-# Copy package files
-COPY package*.json ./
+# Set up auth service directory
+WORKDIR /app/auth-service
+COPY frameforge-auth-service/package*.json ./
 
 # Install only production dependencies
 RUN npm ci --only=production && \
     npm cache clean --force
 
 # Copy built application from builder
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/auth-service/dist ./dist
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
