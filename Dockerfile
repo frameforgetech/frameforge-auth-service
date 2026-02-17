@@ -1,27 +1,26 @@
 # Build stage
 FROM node:20-alpine AS builder
 
-WORKDIR /app
+WORKDIR /build
 
-# Copy shared contracts first
-COPY frameforge-shared-contracts/package*.json ./shared-contracts/
-COPY frameforge-shared-contracts/tsconfig.json ./shared-contracts/
-COPY frameforge-shared-contracts/src ./shared-contracts/src/
+# Copy and build shared contracts first
+COPY frameforge-shared-contracts/package*.json ./frameforge-shared-contracts/
+COPY frameforge-shared-contracts/tsconfig.json ./frameforge-shared-contracts/
+COPY frameforge-shared-contracts/src ./frameforge-shared-contracts/src/
 
-# Build shared contracts
-WORKDIR /app/shared-contracts
+WORKDIR /build/frameforge-shared-contracts
 RUN npm ci && npm run build
 
 # Copy auth service files
-WORKDIR /app/auth-service
+WORKDIR /build/frameforge-auth-service
 COPY frameforge-auth-service/package*.json ./
+COPY frameforge-auth-service/tsconfig.json ./
 
-# Install dependencies (will use the local shared-contracts)
+# Install dependencies (npm will resolve file:../frameforge-shared-contracts)
 RUN npm ci
 
 # Copy source code
 COPY frameforge-auth-service/src ./src/
-COPY frameforge-auth-service/tsconfig.json ./
 
 # Build TypeScript
 RUN npm run build
@@ -32,13 +31,14 @@ FROM node:20-alpine
 # Install tini for proper signal handling
 RUN apk add --no-cache tini
 
-# Set up shared contracts directory
-WORKDIR /app/shared-contracts
-COPY --from=builder /app/shared-contracts/package*.json ./
-COPY --from=builder /app/shared-contracts/dist ./dist/
+WORKDIR /app
+
+# Copy built shared contracts
+COPY --from=builder /build/frameforge-shared-contracts/package*.json ./frameforge-shared-contracts/
+COPY --from=builder /build/frameforge-shared-contracts/dist ./frameforge-shared-contracts/dist/
 
 # Set up auth service directory
-WORKDIR /app/auth-service
+WORKDIR /app/frameforge-auth-service
 COPY frameforge-auth-service/package*.json ./
 
 # Install only production dependencies
@@ -46,7 +46,7 @@ RUN npm ci --only=production && \
     npm cache clean --force
 
 # Copy built application from builder
-COPY --from=builder /app/auth-service/dist ./dist
+COPY --from=builder /build/frameforge-auth-service/dist ./dist
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
