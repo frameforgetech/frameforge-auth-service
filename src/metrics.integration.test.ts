@@ -3,7 +3,7 @@
 import request from 'supertest';
 import app from './index';
 import { AppDataSource } from './database';
-import { User } from '@frameforge/shared-types/dist/entities/User.entity';
+import { User } from '@frameforgetech/shared-contracts';
 import { register } from './metrics';
 
 describe('Metrics Integration Tests', () => {
