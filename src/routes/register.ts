@@ -2,7 +2,7 @@
 
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import { User } from '@frameforge/shared-contracts';
+import { User } from '@frameforgetech/shared-contracts';
 import { AppDataSource } from '../database';
 import { RegisterRequest, RegisterResponse, ErrorResponse } from '../types';
 import { validatePasswordStrength } from '../validation';
@@ -10,6 +10,36 @@ import { registrationAttemptsTotal } from '../metrics';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
+/**
+ * @swagger
+ * /api/v1/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RegisterRequest'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RegisterResponse'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       409:
+ *         description: Username or email already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 export async function registerHandler(req: Request, res: Response): Promise<void> {
   try {
     const { username, email, password } = req.body as RegisterRequest;

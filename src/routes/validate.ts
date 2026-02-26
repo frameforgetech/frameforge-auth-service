@@ -15,6 +15,38 @@ interface JWTPayload {
   exp: number;
 }
 
+/**
+ * @swagger
+ * /api/v1/auth/validate:
+ *   post:
+ *     summary: Validate JWT token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: JWT token to validate
+ *     responses:
+ *       200:
+ *         description: Token validation result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidateResponse'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 export async function validateHandler(req: Request, res: Response): Promise<void> {
   try {
     const { token } = req.body as ValidateRequest;

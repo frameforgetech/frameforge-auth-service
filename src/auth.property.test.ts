@@ -1,12 +1,68 @@
 import fc from 'fast-check';
-import { DataSource } from 'typeorm';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User } from '@frameforge/shared-types/dist/entities/User.entity';
+import { v4 as uuidv4 } from 'uuid';
 import { validatePasswordStrength } from './validation';
 
+// ---------------------------------------------------------------------------
+// In-memory mock repository — no external DB required
+// ---------------------------------------------------------------------------
+interface UserRecord {
+  userId: string;
+  username: string;
+  email: string;
+  passwordHash: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+class InMemoryUserRepo {
+  private store = new Map<string, UserRecord>(); // keyed by userId
+
+  clear() {
+    this.store.clear();
+  }
+
+  create(data: Omit<UserRecord, 'userId' | 'createdAt' | 'updatedAt'>): UserRecord {
+    return {
+      userId: uuidv4(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...data,
+    };
+  }
+
+  async save(user: UserRecord): Promise<UserRecord> {
+    // Enforce unique constraints
+    for (const existing of this.store.values()) {
+      if (existing.userId !== user.userId) {
+        if (existing.username === user.username) {
+          throw new Error(`UNIQUE constraint failed: users.username`);
+        }
+        if (existing.email === user.email) {
+          throw new Error(`UNIQUE constraint failed: users.email`);
+        }
+      }
+    }
+    this.store.set(user.userId, user);
+    return user;
+  }
+
+  async findOne(opts: { where: Partial<UserRecord> }): Promise<UserRecord | null> {
+    for (const user of this.store.values()) {
+      const match = Object.entries(opts.where).every(
+        ([k, v]) => user[k as keyof UserRecord] === v
+      );
+      if (match) return user;
+    }
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+
 describe('Authentication Property Tests', () => {
-  let dataSource: DataSource;
+  const userRepo = new InMemoryUserRepo();
   const JWT_SECRET = 'test-secret-for-property-tests';
   const JWT_EXPIRATION = 3600; // 1 hour in seconds
   const BCRYPT_SALT_ROUNDS = 10;
@@ -14,45 +70,8 @@ describe('Authentication Property Tests', () => {
   // Set timeout for all tests in this suite (property tests take longer)
   jest.setTimeout(60000); // 60 seconds
 
-  beforeAll(async () => {
-    // Initialize PostgreSQL database for testing
-    // Requires a running PostgreSQL instance (e.g., via docker-compose up -d postgres)
-    dataSource = new DataSource({
-      type: 'postgres',
-      host: process.env.TEST_DB_HOST || 'localhost',
-      port: parseInt(process.env.TEST_DB_PORT || '5432'),
-      username: process.env.TEST_DB_USER || 'frameforge',
-      password: process.env.TEST_DB_PASSWORD || 'frameforge',
-      database: process.env.TEST_DB_NAME || 'frameforge',
-      entities: [User],
-      synchronize: true, // Auto-create schema for tests
-      dropSchema: true, // Clean slate for each test run
-      logging: false,
-      ssl: false,
-      extra: {
-        max: 10,
-        connectionTimeoutMillis: 5000,
-      },
-    });
-
-    try {
-      await dataSource.initialize();
-    } catch (error) {
-      console.error('Failed to connect to test database. Make sure PostgreSQL is running.');
-      console.error('You can start it with: docker-compose up -d postgres');
-      throw error;
-    }
-  });
-
-  afterAll(async () => {
-    if (dataSource && dataSource.isInitialized) {
-      await dataSource.destroy();
-    }
-  });
-
-  beforeEach(async () => {
-    // Clean up all data before each test
-    await dataSource.getRepository(User).createQueryBuilder().delete().execute();
+  beforeEach(() => {
+    userRepo.clear();
   });
 
   /**
@@ -72,7 +91,6 @@ describe('Authentication Property Tests', () => {
             ),
           }),
           async ({ username, email, password }) => {
-            const userRepo = dataSource.getRepository(User);
 
             // Make username and email unique
             const uniqueSuffix = `_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -132,7 +150,6 @@ describe('Authentication Property Tests', () => {
           fc.stringMatching(/^[a-zA-Z0-9_]{3,50}$/),
           fc.string({ minLength: 8, maxLength: 50 }),
           async (username, _password) => {
-            const userRepo = dataSource.getRepository(User);
 
             // Attempt to find non-existent user
             const user = await userRepo.findOne({ where: { username } });
@@ -159,7 +176,6 @@ describe('Authentication Property Tests', () => {
             ),
           }).filter(({ correctPassword, wrongPassword }) => correctPassword !== wrongPassword),
           async ({ username, email, correctPassword, wrongPassword }) => {
-            const userRepo = dataSource.getRepository(User);
 
             // Make username and email unique
             const uniqueSuffix = `_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -279,7 +295,6 @@ describe('Authentication Property Tests', () => {
             ),
           }),
           async ({ username, email, password }) => {
-            const userRepo = dataSource.getRepository(User);
 
             // Make username and email unique
             const uniqueSuffix = `_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -340,7 +355,7 @@ describe('Authentication Property Tests', () => {
             ),
           }).filter(({ email1, email2 }) => email1 !== email2),
           async ({ username, email1, email2, password }) => {
-            const userRepo = dataSource.getRepository(User);
+            userRepo.clear(); // reset for each iteration
 
             // Create first user
             const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
@@ -378,7 +393,7 @@ describe('Authentication Property Tests', () => {
             ),
           }).filter(({ username1, username2 }) => username1 !== username2),
           async ({ username1, username2, email, password }) => {
-            const userRepo = dataSource.getRepository(User);
+            userRepo.clear(); // reset for each iteration
 
             // Create first user
             const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);

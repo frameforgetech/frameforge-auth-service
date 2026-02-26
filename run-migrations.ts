@@ -1,12 +1,12 @@
 // Run database migrations
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { User } from '@frameforge/shared-contracts';
+import { User } from '@frameforgetech/shared-contracts';
 
 // Import migrations
-import { CreateUsersTable1700000001000 } from '@frameforge/shared-contracts/dist/migrations/1700000001000-CreateUsersTable';
-import { CreateVideoJobsTable1700000002000 } from '@frameforge/shared-contracts/dist/migrations/1700000002000-CreateVideoJobsTable';
-import { CreateNotificationLogTable1700000003000 } from '@frameforge/shared-contracts/dist/migrations/1700000003000-CreateNotificationLogTable';
+import { CreateUsersTable1700000001000 } from '@frameforgetech/shared-contracts/dist/migrations/1700000001000-CreateUsersTable';
+import { CreateVideoJobsTable1700000002000 } from '@frameforgetech/shared-contracts/dist/migrations/1700000002000-CreateVideoJobsTable';
+import { CreateNotificationLogTable1700000003000 } from '@frameforgetech/shared-contracts/dist/migrations/1700000003000-CreateNotificationLogTable';
 
 const AppDataSource = new DataSource({
   type: 'postgres',
